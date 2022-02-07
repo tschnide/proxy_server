@@ -1,19 +1,3 @@
-#!/usr/bin/python3.7
-# # TODO: remove traceback import traceback
-# from datetime import datetime
-# from email.policy import HTTP
-# from operator import ne
-# from optparse import OptionParser
-# from pydoc import cli
-# from random import getrandbits
-# from sre_constants import GROUPREF_EXISTS
-# import sys
-# import signal
-# import re
-# from socket import *
-# from urllib import request
-# from urllib.parse import urlparse
-# from _thread import import datetime
 from datetime import datetime
 from optparse import OptionParser
 import re
@@ -23,17 +7,22 @@ from urllib.parse import urlparse
 from socket import *
 from _thread import *
 
-# Signal handler for pressing ctrl-c
-
 
 def ctrl_c_pressed(signal, frame):
+    # Signal handler for pressing ctrl-c
     sys.exit(0)
 
 
+# Constants
 BUFFER_SIZE = 65536
 
 
 def is_response_200(response):
+    """
+    Determines if an HTTP response has a 200 error code.
+    Parameter:  response - A full HTTP response.
+    Returns:    boolean
+    """
     error_code = response.split(' ')[1]
     if error_code != '200':
         return False
@@ -42,6 +31,11 @@ def is_response_200(response):
 
 
 def validate_client_request(client_request):
+    """
+    Validate an HTTP/1.0 request-URI by the standards set in RFC 1945.
+    Parameter:  An array with each line of the request as an element.
+    Returns:    An appropriate HTTP error code for errors, otherwise "OK".
+    """
     GET_INDEX = 0
     URL_INDEX = 1
     version_index = 2
@@ -85,6 +79,13 @@ def validate_client_request(client_request):
 
 
 def decompose_URI_request(client_request):
+    """
+    Takes a client request URI and breaks it into its component parts:
+    port number, path, host, and headers.
+
+    Parameter:  An array with each line of the request as an element.
+    Returns:    A tuple containing each part of the request.
+    """
     request_line = client_request[0]
     no_get_str = request_line.replace('GET', '')
     no_http_str = no_get_str.replace('HTTP/1.0', '')
@@ -117,24 +118,35 @@ def decompose_URI_request(client_request):
         path = parsed_url.path
 
     request_info = (port_number, path, host)
-    # print(f'r_info before: {request_info}')
+    # TODO: Test - 1
     for x in range(1, len(client_request) - 1):
         if client_request[x].split(' ')[0] == 'Connection:':
             request_info = request_info + ('Connection: close',)
         else:
             request_info = request_info + (client_request[x],)
-    # print(f'r_info after: {request_info}')
     return request_info
 
 
 def get_server_name_and_port(client_request):
+    """
+    Takes a client request and returns the host and port number.
+
+    Parameter:  An array with each line of the request as an element.
+    Returns:    A tuple containing the host name and the port number.
+    """
     request_info = decompose_URI_request(client_request)
     port_number = int(request_info[0])
-    server_name = request_info[2]
-    return (server_name, port_number)
+    host_name = request_info[2]
+    return (host_name, port_number)
 
 
 def CONVERT_TO_GET_REQUEST(client_request):
+    """
+    Takes a request-URI and converts it to a standard HTML request.
+
+    Parameter:  An array with each line of the request as an element.
+    Returns:    A muli-line string HTTP request conforming to RFC 1945.
+    """
     request_info = decompose_URI_request(client_request)
     HTTP_REQUEST = ''
     # print(f'request info: {request_info}')
@@ -153,6 +165,15 @@ def CONVERT_TO_GET_REQUEST(client_request):
 
 
 def get_date():
+    """
+    Creates a date timestamp with a two digit day and month, a four digit year,
+    and two digit, hour, minute and seconds. 
+
+    Example: 01, 01 01 2000 12:00:00 GMT
+
+    Parameters: None
+    Returns:    A string timestamp.
+    """
     date = datetime.now()
     day = date.strftime('%a')
     day_of_month = date.strftime('%d')
@@ -169,6 +190,17 @@ cache = {}
 
 
 def client_connection_thread(client_connection_socket):
+    """
+    Handles the recieving of data in this thread. If a request from the client
+    is valid it will check if the request has been cached and if it has been
+    modified on the origin server. If it is in the cache and it has not been 
+    modified since it was cached it will return the cached request to the client,
+    otherwise it sends the client request to the origin server, caches the request,
+    and returns it to the client.
+
+    Parameter:  A socket holding the connection to a client.
+    Returns:    Nothing.
+    """
     next_request = ''
     client_request = []
     while next_request != '\r\n':
@@ -251,16 +283,18 @@ if __name__ == '__main__':
 
     # Set up server socket
     proxy_to_client_socket = socket(AF_INET, SOCK_STREAM)
-    # proxy_server_socket.bind(('', proxy_port))
     proxy_to_client_socket.bind((proxy_address, proxy_port))
     proxy_to_client_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
     proxy_to_client_socket.listen(10)
     print(f'Proxy ready to accept connections.')
-    # Set up client socket
+
+    # Listen for clients and create a thread for each new connection.
     connection_count = 0
     while True:
         client_connection_socket, addr = proxy_to_client_socket.accept()
+
         connection_count += 1
         print(f'Connection {connection_count} established.')
+
         start_new_thread(client_connection_thread, (
             client_connection_socket,))
